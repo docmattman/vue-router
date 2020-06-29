@@ -22,6 +22,9 @@ export class HTML5History extends History {
     }
 
     const router = this.router
+    if (!router || !router.options) {
+      return
+    }
     const expectScroll = router.options.scrollBehavior
     const supportsScroll = supportsPushState && expectScroll
 
