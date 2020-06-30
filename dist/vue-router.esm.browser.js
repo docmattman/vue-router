@@ -208,7 +208,8 @@ function resolveQuery (
     parsedQuery = {};
   }
   for (const key in extraQuery) {
-    parsedQuery[key] = extraQuery[key];
+    const value = extraQuery[key];
+    parsedQuery[key] = Array.isArray(value) ? value.map(v => '' + v) : '' + value;
   }
   return parsedQuery
 }
@@ -347,6 +348,8 @@ function isSameRoute (a, b) {
     return a === b
   } else if (!b) {
     return false
+  } else if (!a) {
+    return false
   } else if (a.path && b.path) {
     return (
       a.path.replace(trailingSlashRE, '') === b.path.replace(trailingSlashRE, '') &&
@@ -385,6 +388,9 @@ function isObjectEqual (a = {}, b = {}) {
 }
 
 function isIncludedRoute (current, target) {
+  if (!current) {
+    return false
+  }
   return (
     current.path.replace(trailingSlashRE, '/').indexOf(
       target.path.replace(trailingSlashRE, '/')
@@ -2441,6 +2447,9 @@ class HTML5History extends History {
     }
 
     const router = this.router;
+    if (!router || !router.options) {
+      return
+    }
     const expectScroll = router.options.scrollBehavior;
     const supportsScroll = supportsPushState && expectScroll;
 
@@ -2476,20 +2485,28 @@ class HTML5History extends History {
 
   push (location, onComplete, onAbort) {
     const { current: fromRoute } = this;
-    this.transitionTo(location, route => {
-      pushState(cleanPath(this.base + route.fullPath));
-      handleScroll(this.router, route, fromRoute, false);
-      onComplete && onComplete(route);
-    }, onAbort);
+    this.transitionTo(
+      location,
+      route => {
+        pushState(cleanPath(this.base + route.fullPath));
+        handleScroll(this.router, route, fromRoute, false);
+        onComplete && onComplete(route);
+      },
+      onAbort
+    );
   }
 
   replace (location, onComplete, onAbort) {
     const { current: fromRoute } = this;
-    this.transitionTo(location, route => {
-      replaceState(cleanPath(this.base + route.fullPath));
-      handleScroll(this.router, route, fromRoute, false);
-      onComplete && onComplete(route);
-    }, onAbort);
+    this.transitionTo(
+      location,
+      route => {
+        replaceState(cleanPath(this.base + route.fullPath));
+        handleScroll(this.router, route, fromRoute, false);
+        onComplete && onComplete(route);
+      },
+      onAbort
+    );
   }
 
   ensureURL (push) {
@@ -2841,8 +2858,18 @@ class VueRouter {
     const history = this.history;
 
     if (history instanceof HTML5History || history instanceof HashHistory) {
-      const setupListeners = () => {
+      const handleInitialScroll = (routeOrError) => {
+        const from = history.current;
+        const expectScroll = this.options.scrollBehavior;
+        const supportsScroll = supportsPushState && expectScroll;
+
+        if (supportsScroll && 'fullPath' in routeOrError) {
+          handleScroll(this, routeOrError, from, false);
+        }
+      };
+      const setupListeners = (routeOrError) => {
         history.setupListeners();
+        handleInitialScroll(routeOrError);
       };
       history.transitionTo(history.getCurrentLocation(), setupListeners, setupListeners);
     }

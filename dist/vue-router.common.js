@@ -217,7 +217,8 @@ function resolveQuery (
     parsedQuery = {};
   }
   for (var key in extraQuery) {
-    parsedQuery[key] = extraQuery[key];
+    var value = extraQuery[key];
+    parsedQuery[key] = Array.isArray(value) ? value.map(function (v) { return '' + v; }) : '' + value;
   }
   return parsedQuery
 }
@@ -360,6 +361,8 @@ function isSameRoute (a, b) {
     return a === b
   } else if (!b) {
     return false
+  } else if (!a) {
+    return false
   } else if (a.path && b.path) {
     return (
       a.path.replace(trailingSlashRE, '') === b.path.replace(trailingSlashRE, '') &&
@@ -401,6 +404,9 @@ function isObjectEqual (a, b) {
 }
 
 function isIncludedRoute (current, target) {
+  if (!current) {
+    return false
+  }
   return (
     current.path.replace(trailingSlashRE, '/').indexOf(
       target.path.replace(trailingSlashRE, '/')
@@ -2453,6 +2459,9 @@ var HTML5History = /*@__PURE__*/(function (History) {
     }
 
     var router = this.router;
+    if (!router || !router.options) {
+      return
+    }
     var expectScroll = router.options.scrollBehavior;
     var supportsScroll = supportsPushState && expectScroll;
 
@@ -2491,11 +2500,15 @@ var HTML5History = /*@__PURE__*/(function (History) {
 
     var ref = this;
     var fromRoute = ref.current;
-    this.transitionTo(location, function (route) {
-      pushState(cleanPath(this$1.base + route.fullPath));
-      handleScroll(this$1.router, route, fromRoute, false);
-      onComplete && onComplete(route);
-    }, onAbort);
+    this.transitionTo(
+      location,
+      function (route) {
+        pushState(cleanPath(this$1.base + route.fullPath));
+        handleScroll(this$1.router, route, fromRoute, false);
+        onComplete && onComplete(route);
+      },
+      onAbort
+    );
   };
 
   HTML5History.prototype.replace = function replace (location, onComplete, onAbort) {
@@ -2503,11 +2516,15 @@ var HTML5History = /*@__PURE__*/(function (History) {
 
     var ref = this;
     var fromRoute = ref.current;
-    this.transitionTo(location, function (route) {
-      replaceState(cleanPath(this$1.base + route.fullPath));
-      handleScroll(this$1.router, route, fromRoute, false);
-      onComplete && onComplete(route);
-    }, onAbort);
+    this.transitionTo(
+      location,
+      function (route) {
+        replaceState(cleanPath(this$1.base + route.fullPath));
+        handleScroll(this$1.router, route, fromRoute, false);
+        onComplete && onComplete(route);
+      },
+      onAbort
+    );
   };
 
   HTML5History.prototype.ensureURL = function ensureURL (push) {
@@ -2873,8 +2890,18 @@ VueRouter.prototype.init = function init (app /* Vue component instance */) {
   var history = this.history;
 
   if (history instanceof HTML5History || history instanceof HashHistory) {
-    var setupListeners = function () {
+    var handleInitialScroll = function (routeOrError) {
+      var from = history.current;
+      var expectScroll = this$1.options.scrollBehavior;
+      var supportsScroll = supportsPushState && expectScroll;
+
+      if (supportsScroll && 'fullPath' in routeOrError) {
+        handleScroll(this$1, routeOrError, from, false);
+      }
+    };
+    var setupListeners = function (routeOrError) {
       history.setupListeners();
+      handleInitialScroll(routeOrError);
     };
     history.transitionTo(history.getCurrentLocation(), setupListeners, setupListeners);
   }
